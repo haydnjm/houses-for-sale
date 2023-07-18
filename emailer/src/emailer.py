@@ -1,152 +1,158 @@
-from bs4 import BeautifulSoup
-import requests
-from google.cloud import bigquery
-import re
+from datetime import datetime, timedelta
 import os
+import base64
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 from dotenv import load_dotenv
-from datetime import datetime
+from googleapiclient.discovery import build
+from google.cloud import bigquery
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 load_dotenv()
 
+env = os.getenv("ENV")
+sender_email = os.getenv("SENDER") or ""
+email_password = os.getenv("EMAIL_PASSWORD") or ""
 gcp_project = os.getenv("GCP_PROJECT")
 service_account_path = os.getenv("SERVICE_ACCOUNT_PATH")
 bq_dataset = os.getenv("BQ_DATASET")
-bq_table = os.getenv("BQ_TABLE")
-env = os.getenv("ENV")
+filters_table = os.getenv("FILTERS_TABLE")
+houses_table = os.getenv("HOUSES_TABLE")
 
-print("ENV: ", gcp_project, service_account_path, bq_dataset, bq_table)
+smtp_server = "smtp.gmail.com"  # Replace with your SMTP server address
+smtp_port = 587  # Replace with the appropriate port for your SMTP server
 
-# Set up BigQuery client
+print(
+    "ENV: ",
+    env,
+    " | ",
+    sender_email,
+    " | ",
+    gcp_project,
+    " | ",
+    service_account_path,
+    " | ",
+    bq_dataset,
+    " | ",
+    filters_table,
+    " | ",
+    houses_table,
+)
 
-client = bigquery.Client.from_service_account_json(service_account_path) if env == "dev" else bigquery.Client()
+bq_client = (
+    bigquery.Client.from_service_account_json(service_account_path)
+    if env == "dev"
+    else bigquery.Client()
+)
+email_service = build("gmail", "v1")
 
-def get_svg_type(path: str):
-    if "M38.5 32.25v-16.5a5" in path:
-        return "floor-space"
-    if "M11 20l-3.999" in path:
-        return "bedrooms"
-    if "M23.675 12.891l-6.852" in path:
-        return "energy label"
-    
-    return "unknown"
 
-def get_int_from_string(text: str):
-    # Regular expression pattern to find a word starting with 'q' and ending with 'k'
-    pattern = r'\d+'
+def build_house_query(filter: dict):
+    base_table_id = f"{gcp_project}.{bq_dataset}"
 
-    # Using findall to find all occurrences of the pattern
-    matches = re.findall(pattern, text)
+    current_time = datetime.now()
+    current_time_minus_one_hour = current_time - timedelta(hours=1)
+    query = f"""
+        SELECT * FROM `{base_table_id}.{houses_table}`
+        WHERE inserted_date >= '{current_time_minus_one_hour.isoformat()}'
+    """
 
-    if matches:
-        # Joining the matches into a single string and converting it to an integer
-        return int(''.join(matches))
-    else:
-        return ""
+    if filter["min_price"] is not None:
+        query += f" AND price_sale >= {filter['min_price']}"
+    if filter["max_price"] is not None:
+        query += f" AND price_sale <= {filter['max_price']}"
+    if filter["min_price_per_m2"] is not None:
+        query += f" AND price_per_m2 >= {filter['min_price_per_m2']}"
+    if filter["max_price_per_m2"] is not None:
+        query += f" AND price_per_m2 <= {filter['max_price_per_m2']}"
+    if filter["min_bedrooms"] is not None:
+        query += f" AND bedrooms >= {filter['min_bedrooms']}"
+    if filter["max_bedrooms"] is not None:
+        query += f" AND bedrooms <= {filter['max_bedrooms']}"
+    if filter["min_floor_space"] is not None:
+        query += f" AND floor_space >= {filter['min_floor_space']}"
+    if filter["max_floor_space"] is not None:
+        query += f" AND floor_space <= {filter['max_floor_space']}"
 
-def get_postal_code(text: str):
-    pattern = r'(\d{4})(.+)?([A-Z]{2})'
+    return query
 
-    matches = re.findall(pattern, text)
 
-    if matches[0] and len(matches[0]) == 3:
-        return matches[0][0] + matches[0][2]
-    else:
-        return "Invalid postcode "+text
+# Create a message for an email via the gmail api
+def create_message(recipient, subject, content):
+    message = MIMEMultipart()
+    message["From"] = sender_email
+    message["To"] = recipient
+    message["Subject"] = subject
+    message.attach(MIMEText(content, "html"))
+    return message
 
-def scrape_funda():
-    base_url = os.getenv("FUNDA_BASE_URL")
-    houses = []
 
-    # Send a GET request to the URL and retrieve the HTML content
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-    
-    for x in range(1, 4):
-        
-        if env == "dev":
-            print("[DEV] Scraping: ", base_url)
-            soup = BeautifulSoup(open("./test-page.html"), 'html.parser')
-        else:
-            url = base_url + f"&search_result={x}"
-            response = requests.get(url, headers=headers)
-            print("Scraping: ", url)
-            soup = BeautifulSoup(response.content, 'html.parser')
-        
+def send_email_for_house(recipient_email: str, house: dict):
+    subject = house["id"]
+    content = f"""
+        <h1><a href='{house['link']}'>{house['id']}</a></h1>
+        <p><b>€{int(house['price_sale']/1000)}k</b></p>
+        <p><b>{house['floor_space']}m2</b></p>
+        <p>{house['bedrooms']} bedrooms</p>
+        <p>{int(house['price_per_m2'])}€/m2</p>
+        <img src="https://zeefamily.net/wp-content/uploads/2022/06/Amsterdam_Postcode_Map.jpg" width="300px"/>
+    """
 
-        # Extract the desired properties from the HTML
-        all_houses = soup.find_all('div', {'data-test-id': "search-result-item"})
+    message = create_message(recipient_email, subject, content)
 
-        for search_result_item in all_houses:
-            house_name_number = search_result_item.find('h2', {'data-test-id': "street-name-house-number"}).text.strip()
-            price_sale_element = search_result_item.find('p', {'data-test-id': "price-sale"})
-            price_sale = get_int_from_string(price_sale_element.text.strip())
-            postal_code_city = search_result_item.find('div', {'data-test-id': "postal-code-city"}).text.strip()
-            link = search_result_item.find('a', {'data-test-id': "object-image-link"})['href']
+    server = smtplib.SMTP(smtp_server, smtp_port)
+    try:
+        # Connect to the SMTP server
+        server.starttls()  # Upgrade the connection to a secure encrypted one
 
-            floor_space = 0
-            bedrooms = 0
-            energy_label = ""
+        # Log in to the SMTP server
+        # Replace 'your_email_password' with your email account password or app-specific password
+        server.login(sender_email, email_password)
 
-            attributes_list = price_sale_element.find_next('ul')
-            attributes = attributes_list.find_all('li')
-            for attribute in attributes:
-                svg_path = attribute.find_next('path')['d']
-                svg_type = get_svg_type(svg_path)
-                li_text = attribute.text.strip()
+        # Send the email
+        server.sendmail(sender_email, recipient_email, message.as_string())
 
-                match svg_type:
-                    case "floor-space":
-                        floor_space = get_int_from_string(li_text)
+        print("Email sent successfully!")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        # Close the SMTP connection
+        server.quit()
 
-                    case "bedrooms":
-                        bedrooms = get_int_from_string(li_text)
 
-                    case "energy label":
-                        energy_label = li_text.strip()
+# Get all houses that need to be emailed since the last trigger
+def main():
+    # First, get all filters
+    base_table_id = f"{gcp_project}.{bq_dataset}"
+    filters_query = f"SELECT * FROM `{base_table_id}.{filters_table}` LIMIT 1"
+    print(filters_query)
+    filters = list(bq_client.query(filters_query).result())
 
-            # # Create a dictionary representing the property data
-            property_data = {
-                'id': house_name_number+" "+postal_code_city,
-                'house_name_number': house_name_number,
-                'price_sale': price_sale,
-                'postal_code': get_postal_code(postal_code_city),
-                'floor_space': floor_space,
-                'bedrooms': bedrooms,
-                'energy_label': energy_label,
-                'price_per_m2': int(price_sale / floor_space) if floor_space > 0 else 0,
-                'link': link,
-                'inserted_date': datetime.now().isoformat()
-            }
+    print(filters)
 
-            houses.append(property_data)
-            
-    return houses
+    if len(filters) == 0:
+        print("No filters found with query ", filters_query)
+        return []
 
-def write_to_bigquery(rows):
+    # TODO: Send emails to different user per filter
+    # Get all houses that belongs to each filter
+    for filter in filters:
+        if filter["email"] is None:
+            print("No email found for filter ", filter)
+            continue
 
-    # Big query table Id
-    table_id = f"{gcp_project}.{bq_dataset}.{bq_table}"
+        houses_query = build_house_query(filter)
+        print(houses_query)
 
-    for row in rows:
-        # Check if row already exists in BigQuery
-        query = f'SELECT * FROM `{table_id}` where id="{row["id"]}" LIMIT 1'
-        results = client.query(query).result()
-        results_list = list(results)
+        houses_result = bq_client.query(houses_query).result()
+        houses = list(houses_result)
 
-        if len(results_list) == 0:
-            # Insert the rows into BigQuery table
-            errors = client.insert_rows_json(table_id, rows, row_ids=[None] * len(rows), skip_invalid_rows=True)
+        print(f"{len(houses)} houses found!")
 
-            if errors:
-                print(f"Encountered errors while inserting {row.id}: {errors}")
-            else:
-                print(f"Successfully inserted {row['id']}")
-        else:
-            print(f"Row with id {row['id']} already exists in BigQuery.")
+        for house in houses:
+            send_email_for_house(filter["email"], house)
 
-# Scrape the properties
-funda_houses = scrape_funda()
 
-# Write the funda_houses to BigQuery
-write_to_bigquery(funda_houses)
+main()

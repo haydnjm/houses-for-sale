@@ -12,4 +12,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY /src .
 
 # Specify the command to run the Python script
-ENTRYPOINT ["python", "scraper.py"]
+ENTRYPOINT ["python", "emailer.py"]
