@@ -36,7 +36,7 @@ def build_house_query(filter: dict):
     base_table_id = f"{gcp_project}.{bq_dataset}"
 
     current_time = datetime.now()
-    current_time_minus_one_hour = current_time - timedelta(hours=1)
+    current_time_minus_one_hour = current_time - timedelta(hours=24)
     query = f"""
         SELECT * FROM `{base_table_id}.{houses_table}`
         WHERE inserted_date >= '{current_time_minus_one_hour.isoformat()}'
@@ -73,14 +73,15 @@ def create_message(recipient, subject, content):
 
 
 def send_email_for_house(recipient_email: str, house: dict):
-    subject = house["id"]
+    formatted_price = int(house["price_sale"] / 1000)
+    subject = f"{house['id']}"
     content = f"""
-        <h1><a href='{house['link']}'>{house['id']}</a></h1>
-        <p><b>€{int(house['price_sale']/1000)}k</b></p>
-        <p><b>{house['floor_space']}m2</b></p>
-        <p>{house['bedrooms']} bedrooms</p>
+        <p>{house['neighborhood']}, {house['wijk']}, {house['zone']}</p>
+        <p>€{formatted_price}k</p>
+        <p>{house['floor_space']}m2</p>
         <p>{int(house['price_per_m2'])}€/m2</p>
-        <img src="https://zeefamily.net/wp-content/uploads/2022/06/Amsterdam_Postcode_Map.jpg" width="300px"/>
+        <p>{house['bedrooms']} bedrooms</p>
+        <h3><a href='{house['link']}'>To listing</a></h3>
     """
 
     message = create_message(recipient_email, subject, content)

@@ -181,7 +181,8 @@ def write_to_bigquery(rows):
         if len(results_list) == 0:
             # Insert the rows into BigQuery table
             errors = client.insert_rows_json(
-                table_id, rows, row_ids=[None] * len(rows), skip_invalid_rows=True
+                table_id,
+                [row],
             )
 
             if errors:
