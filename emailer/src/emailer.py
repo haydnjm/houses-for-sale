@@ -36,7 +36,7 @@ def build_house_query(filter: dict):
     base_table_id = f"{gcp_project}.{bq_dataset}"
 
     current_time = datetime.now()
-    current_time_minus_one_hour = current_time - timedelta(hours=24)
+    current_time_minus_one_hour = current_time - timedelta(minutes=30)
     query = f"""
         SELECT * FROM `{base_table_id}.{houses_table}`
         WHERE inserted_date >= '{current_time_minus_one_hour.isoformat()}'
