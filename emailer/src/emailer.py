@@ -24,23 +24,6 @@ houses_table = os.getenv("HOUSES_TABLE")
 smtp_server = "smtp.gmail.com"  # Replace with your SMTP server address
 smtp_port = 587  # Replace with the appropriate port for your SMTP server
 
-print(
-    "ENV: ",
-    env,
-    " | ",
-    sender_email,
-    " | ",
-    gcp_project,
-    " | ",
-    service_account_path,
-    " | ",
-    bq_dataset,
-    " | ",
-    filters_table,
-    " | ",
-    houses_table,
-)
-
 bq_client = (
     bigquery.Client.from_service_account_json(service_account_path)
     if env == "dev"
@@ -114,7 +97,7 @@ def send_email_for_house(recipient_email: str, house: dict):
         # Send the email
         server.sendmail(sender_email, recipient_email, message.as_string())
 
-        print("Email sent successfully!")
+        print(f"Email sent successfully to {recipient_email} for house {house['id']}")
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
@@ -127,10 +110,7 @@ def main():
     # First, get all filters
     base_table_id = f"{gcp_project}.{bq_dataset}"
     filters_query = f"SELECT * FROM `{base_table_id}.{filters_table}` LIMIT 1"
-    print(filters_query)
     filters = list(bq_client.query(filters_query).result())
-
-    print(filters)
 
     if len(filters) == 0:
         print("No filters found with query ", filters_query)
@@ -144,7 +124,6 @@ def main():
             continue
 
         houses_query = build_house_query(filter)
-        print(houses_query)
 
         houses_result = bq_client.query(houses_query).result()
         houses = list(houses_result)

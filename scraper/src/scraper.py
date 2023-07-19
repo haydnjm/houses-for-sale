@@ -5,6 +5,7 @@ import re
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+import pandas as pd
 
 load_dotenv()
 
@@ -23,6 +24,8 @@ client = (
     if env == "dev"
     else bigquery.Client()
 )
+
+neighborhood_csv_data = pd.read_csv(f"./pc4.csv")
 
 
 def get_svg_type(path: str):
@@ -61,6 +64,16 @@ def get_postal_code(text: str):
         return "Invalid postcode " + text
 
 
+def get_neighborhood_data(postcode: str):
+    pc4 = postcode[:4]
+    condition = neighborhood_csv_data["pc4"] == int(pc4)
+    df = neighborhood_csv_data[condition]
+    if len(df) > 0:
+        return df.iloc[0]
+    else:
+        return None
+
+
 def scrape_funda():
     base_url = os.getenv("FUNDA_BASE_URL")
 
@@ -78,7 +91,7 @@ def scrape_funda():
     for x in range(1, 4):
         if env == "dev":
             print("[DEV] Scraping: ", base_url)
-            soup = BeautifulSoup(open("./test-page.html"), "html.parser")
+            soup = BeautifulSoup(open("../test-page.html"), "html.parser")
         else:
             url = base_url + f"&search_result={x}"
             response = requests.get(url, headers=headers)
@@ -124,18 +137,30 @@ def scrape_funda():
                     case "energy label":
                         energy_label = li_text.strip()
 
+            postcode = get_postal_code(postal_code_city)
+            neighborhood_data = get_neighborhood_data(postcode)
+
             # # Create a dictionary representing the property data
             property_data = {
                 "id": house_name_number + " " + postal_code_city,
                 "house_name_number": house_name_number,
                 "price_sale": price_sale,
-                "postal_code": get_postal_code(postal_code_city),
+                "postal_code": postcode,
                 "floor_space": floor_space,
                 "bedrooms": bedrooms,
                 "energy_label": energy_label,
                 "price_per_m2": int(price_sale / floor_space) if floor_space > 0 else 0,
                 "link": link,
                 "inserted_date": datetime.now().isoformat(),
+                "neighborhood": neighborhood_data["Naam buurt"]
+                if neighborhood_data is not None
+                else "",
+                "wijk": neighborhood_data["Naam Wijk"]
+                if neighborhood_data is not None
+                else "",
+                "zone": neighborhood_data["Naam stadsdeel"]
+                if neighborhood_data is not None
+                else "",
             }
 
             houses.append(property_data)
