@@ -116,6 +116,11 @@ def scrape_funda():
                 "href"
             ]
 
+            imgSources = search_result_item.find(
+                "img", {"alt": lambda x: x and "main image" in x}
+            )["srcset"].split(" ")
+            img = imgSources[1][5:] if len(imgSources) > 1 else ""
+
             floor_space = 0
             bedrooms = 0
             energy_label = ""
@@ -161,6 +166,7 @@ def scrape_funda():
                 "zone": neighborhood_data["Naam stadsdeel"]
                 if neighborhood_data is not None
                 else "",
+                "image": img,
             }
 
             houses.append(property_data)
@@ -197,4 +203,4 @@ def write_to_bigquery(rows):
 funda_houses = scrape_funda()
 
 # Write the funda_houses to BigQuery
-write_to_bigquery(funda_houses)
+# write_to_bigquery(funda_houses)
