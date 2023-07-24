@@ -76,12 +76,14 @@ def send_email_for_house(recipient_email: str, house: dict):
     formatted_price = int(house["price_sale"] / 1000)
     subject = f"{house['id']}"
     content = f"""
+        {f'<img src="{house["image"]}" />' if house["image"] else ""}
         <p>{house['neighborhood']}, {house['wijk']}, {house['zone']}</p>
         <p>€{formatted_price}k</p>
         <p>{house['floor_space']}m2</p>
         <p>{int(house['price_per_m2'])}€/m2</p>
         <p>{house['bedrooms']} bedrooms</p>
         <h3><a href='{house['link']}'>To listing</a></h3>
+        <h3><a href='{house['link']}#kart'>To map</a></h3>
     """
 
     message = create_message(recipient_email, subject, content)

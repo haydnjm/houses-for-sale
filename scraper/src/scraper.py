@@ -175,6 +175,7 @@ def scrape_funda():
 
 
 def write_to_bigquery(rows):
+    print(f"Attempting to write {len(rows)} rows to BigQuery")
     # Big query table Id
     table_id = f"{gcp_project}.{bq_dataset}.{bq_table}"
 
