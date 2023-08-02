@@ -2,3 +2,4 @@ service-account.json
 scraper-lib
 emailer-lib
 .env
+__pycache__
