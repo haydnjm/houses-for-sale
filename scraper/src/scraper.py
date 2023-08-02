@@ -53,11 +53,11 @@ def write_to_bigquery(rows):
 
 
 # Scrape funda houses
-# funda_houses = scrape_funda(
-#     os.getenv("ENV"),
-# os.getenv("FUNDA_BASE_URL"),
-# os.getenv("FUNDA_SEARCH_URL")
-# )
+funda_houses = scrape_funda(
+    os.getenv("ENV"), os.getenv("FUNDA_BASE_URL"), os.getenv("FUNDA_SEARCH_URL")
+)
+
+write_to_bigquery(funda_houses)
 
 # Scrape Pararius houses
 pararius_houses = scrape_pararius(
