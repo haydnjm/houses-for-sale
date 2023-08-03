@@ -48,9 +48,9 @@ def scrape_pararius(env: str, base_url: str, search_url: str):
                 open(f"{directory}/test-html/pararius-test.html"), "html.parser"
             )
         else:
-            base_url = base_url + f"/page-{x}"  # TODO: UPDATE THIS
-            response = requests.get(base_url, headers=HEADERS)
-            print("Scraping: ", base_url)
+            url = base_url + search_url + f"/page-{x}"
+            response = requests.get(url, headers=HEADERS)
+            print("Scraping: ", url)
             house_html = BeautifulSoup(response.content, "html.parser")
 
         all_houses = house_html.find_all("section", class_="listing-search-item")
@@ -122,4 +122,4 @@ def scrape_pararius(env: str, base_url: str, search_url: str):
 
             houses.append(property_data)
 
-        return houses
+    return houses
