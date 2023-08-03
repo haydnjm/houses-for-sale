@@ -83,7 +83,7 @@ def send_email_for_house(recipient_email: str, house: dict):
         <p>{int(house['price_per_m2'])}€/m2</p>
         <p>{house['bedrooms']} bedrooms</p>
         <h3><a href='{house['link']}'>To listing</a></h3>
-        <h3><a href='{house['link']}#kart'>To map</a></h3>
+        <h3><a href='{house['link']}#kaart'>To map</a></h3>
     """
 
     message = create_message(recipient_email, subject, content)
