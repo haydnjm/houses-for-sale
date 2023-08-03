@@ -83,11 +83,13 @@ def scrape_pararius(env: str, base_url: str, search_url: str):
 
             listing = requests.get(link, headers=HEADERS)
             listing_html = BeautifulSoup(listing.content, "html.parser")
-            print(
-                listing_html.find(
+
+            try:
+                bedrooms = listing_html.find(
                     "dd", class_="listing-features__description--number_of_bedrooms"
                 ).text.strip()
-            )
+            except:
+                bedrooms = 0
 
             neighborhood_data = get_neighborhood_data(postal_code)
 
@@ -101,7 +103,7 @@ def scrape_pararius(env: str, base_url: str, search_url: str):
                 "price_sale": price_sale,
                 "postal_code": postal_code,
                 "floor_space": floor_space,
-                # "bedrooms": bedrooms,
+                "bedrooms": bedrooms,
                 # "energy_label": energy_label,
                 "price_per_m2": int(price_sale / floor_space) if floor_space > 0 else 0,
                 "link": link,

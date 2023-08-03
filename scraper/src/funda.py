@@ -45,7 +45,7 @@ def scrape_funda(env: str, base_url: str, search_url: str):
         if env == "dev":
             print("[DEV] Scraping: ", base_url)
             soup = BeautifulSoup(
-                open(f"{directory}test-html/funda-test.html"), "html.parser"
+                open(f"{directory}/test-html/funda-test.html"), "html.parser"
             )
         else:
             url = base_url + search_url + f"&search_result={x}"
