@@ -17,7 +17,7 @@ print("ENV: ", env, gcp_project, service_account_path, bq_dataset, bq_table)
 
 # Set up BigQuery client
 
-client = (
+bq_client = (
     bigquery.Client.from_service_account_json(
         f"{os.path.dirname(os.path.realpath(__file__))}/{service_account_path}"
     )
@@ -30,7 +30,7 @@ funda_houses = scrape_funda(
     os.getenv("ENV"), os.getenv("FUNDA_BASE_URL"), os.getenv("FUNDA_SEARCH_URL")
 )
 
-write_to_bigquery(client, funda_houses)
+write_to_bigquery(bq_client, funda_houses)
 
 # Scrape Pararius houses
 pararius_houses = scrape_pararius(
@@ -40,4 +40,4 @@ pararius_houses = scrape_pararius(
 )
 
 # Write the funda_houses to BigQuery
-write_to_bigquery(client, pararius_houses)
+write_to_bigquery(bq_client, pararius_houses)
