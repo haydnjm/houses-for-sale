@@ -9,6 +9,7 @@ from google.cloud import bigquery
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import urllib.parse
 
 load_dotenv()
 
@@ -20,15 +21,19 @@ service_account_path = os.getenv("SERVICE_ACCOUNT_PATH")
 bq_dataset = os.getenv("BQ_DATASET")
 filters_table = os.getenv("FILTERS_TABLE")
 houses_table = os.getenv("HOUSES_TABLE")
+maps_api_key = os.getenv("GOOGLE_API_KEY")
 
 smtp_server = "smtp.gmail.com"  # Replace with your SMTP server address
 smtp_port = 587  # Replace with the appropriate port for your SMTP server
 
 bq_client = (
-    bigquery.Client.from_service_account_json(service_account_path)
+    bigquery.Client.from_service_account_json(
+        f"{os.path.dirname(os.path.realpath(__file__))}/{service_account_path}"
+    )
     if env == "dev"
     else bigquery.Client()
 )
+
 email_service = build("gmail", "v1")
 
 
@@ -38,7 +43,7 @@ def build_house_query(filter: dict):
     current_time = datetime.now()
     current_time_minus_one_hour = current_time - timedelta(minutes=30)
     query = f"""
-        SELECT * FROM `{base_table_id}.{houses_table}`
+        SELECT * FROM `{base_table_id}.{houses_table}` LIMIT 1
         WHERE inserted_date >= '{current_time_minus_one_hour.isoformat()}'
     """
 
@@ -62,6 +67,19 @@ def build_house_query(filter: dict):
     return query
 
 
+def build_maps_link(postcode: str):
+    params = {
+        "center": f"{postcode}+amsterdam",
+        "zoom": 14,
+        "scale": 2,
+        "size": "350x350",
+        "maptype": "roadmap",
+        "format": "png",
+        "key": maps_api_key,
+    }
+    return f"https://maps.googleapis.com/maps/api/staticmap?{urllib.parse.urlencode(params, False, ':')}&markers=size:mid%7Ccolor:0xff8700%7Clabel:%7C{postcode}%20amsterdam"
+
+
 # Create a message for an email via the gmail api
 def create_message(recipient, subject, content):
     message = MIMEMultipart()
@@ -77,13 +95,13 @@ def send_email_for_house(recipient_email: str, house: dict):
     subject = f"{house['id']}"
     content = f"""
         {f'<img src="{house["image"]}" />' if house["image"] else ""}
+        {f'<img src="{build_maps_link(house["postal_code"])}" />' if house["postal_code"] else ""}
         <p>{house['neighborhood']}, {house['wijk']}, {house['zone']}</p>
         <p>€{formatted_price}k</p>
         <p>{house['floor_space']}m2</p>
         <p>{int(house['price_per_m2'])}€/m2</p>
         <p>{house['bedrooms']} bedrooms</p>
         <h3><a href='{house['link']}'>To listing</a></h3>
-        <h3><a href='{house['link']}#kaart'>To map</a></h3>
     """
 
     message = create_message(recipient_email, subject, content)
