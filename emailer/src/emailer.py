@@ -43,7 +43,7 @@ def build_house_query(filter: dict):
     current_time = datetime.now()
     current_time_minus_one_hour = current_time - timedelta(minutes=30)
     query = f"""
-        SELECT * FROM `{base_table_id}.{houses_table}` LIMIT 1
+        SELECT * FROM `{base_table_id}.{houses_table}`
         WHERE inserted_date >= '{current_time_minus_one_hour.isoformat()}'
     """
 
@@ -130,7 +130,7 @@ def send_email_for_house(recipient_email: str, house: dict):
 def main():
     # First, get all filters
     base_table_id = f"{gcp_project}.{bq_dataset}"
-    filters_query = f"SELECT * FROM `{base_table_id}.{filters_table}` LIMIT 1"
+    filters_query = f"SELECT * FROM `{base_table_id}.{filters_table}` LIMIT 2"
     filters = list(bq_client.query(filters_query).result())
 
     if len(filters) == 0:
@@ -143,6 +143,8 @@ def main():
         if filter["email"] is None:
             print("No email found for filter ", filter)
             continue
+        
+        print("Sending emails for filter ", filter["email"])
 
         houses_query = build_house_query(filter)
 
