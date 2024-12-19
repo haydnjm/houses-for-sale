@@ -1,8 +1,5 @@
 from datetime import datetime, timedelta
 import os
-import base64
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 from google.cloud import bigquery
@@ -143,7 +140,7 @@ def main():
         if filter["email"] is None:
             print("No email found for filter ", filter)
             continue
-        
+
         print("Sending emails for filter ", filter["email"])
 
         houses_query = build_house_query(filter)

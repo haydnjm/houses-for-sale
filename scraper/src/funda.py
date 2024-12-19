@@ -24,14 +24,27 @@ def get_svg_type(path: str):
 
 
 def get_postal_code(text: str):
-    pattern = r"(\d{4})(.+)?([A-Z]{2})"
+    try:
+        # First try to match full postal code pattern
+        full_pattern = r"(\d{4})(.+)?([A-Z]{2})"
+        full_matches = re.findall(full_pattern, text)
 
-    matches = re.findall(pattern, text)
+        if full_matches and len(full_matches[0]) == 3:
+            return full_matches[0][0] + full_matches[0][2]
 
-    if matches[0] and len(matches[0]) == 3:
-        return matches[0][0] + matches[0][2]
-    else:
+        # If no full match, try to match just the numbers
+        number_pattern = r"(\d{4})"
+        number_matches = re.findall(number_pattern, text)
+
+        if number_matches:
+            return number_matches[0]
+
+        print(f"Invalid postcode format: {text}")
         return "Invalid postcode: " + text
+    except Exception as e:
+        print(f"Failed to parse postcode from text: {text}")
+        print(f"Error: {str(e)}")
+        return None
 
 
 def scrape_funda(env: str, base_url: str, search_url: str):
@@ -98,7 +111,7 @@ def scrape_funda(env: str, base_url: str, search_url: str):
                         energy_label = li_text.strip()
 
             postcode = get_postal_code(postal_code_city)
-            neighborhood_data = get_neighborhood_data(postcode)
+            neighborhood_data = get_neighborhood_data(postcode) if postcode is not None else None
 
             # # Create a dictionary representing the property data
             property_data = {
