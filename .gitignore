@@ -3,3 +3,4 @@ scraper/scraper-lib
 emailer/emailer-lib
 .env
 __pycache__
+/scraper/src/test-html
